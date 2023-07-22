@@ -1,18 +1,43 @@
 # Clone project from GitLab
 clone() {
+  # Config
   token="PRIVATE-TOKEN: yourPersonalToken"
   domain="yourGitLabDomain"
 
-  link_header=$(curl --head --header "$token" "https://$domain/api/v4/projects?per_page=100" | grep -i "link:")
+  # Get last page number
+  link_header=$(curl --head --header "$token" https://gitlab.gruposalvadorcaetano.pt/api/v4/projects?per_page=100 | grep -i "link:")
   last_page_url=$(echo "$link_header" | grep -oE '<[^>]+>; rel="last"' | sed -E 's/<(.+)>; rel="last"/\1/')
   last_page_param=$(echo "$last_page_url" | grep -oP '&page=[\d]+')
   last_page=$(echo "$last_page_param" | grep -oP '\d+')
 
-  projects=$(curl --header "$token" "https://$domain/api/v4/projects?per_page=100&page=1" | jq -r '.[] | .http_url_to_repo')
-
+  # Set array with all pages' URLs
+  urls=("https://$domain/api/v4/projects?per_page=100&page=1")
   for ((i = 2; i <= $last_page; i++)); do
-    projects="$projects\n$(curl --header "$token" "https://$domain/api/v4/projects?per_page=100&page=$i" | jq -r '.[] | .http_url_to_repo')"
+    urls+=("https://$domain/api/v4/projects?per_page=100&page=$i")
   done
+
+  mkdir -p /tmp-clone-responses
+
+  # Call all pages asynchronously
+  i=0
+  for url in "${urls[@]}"; do
+    curl --header "$token" -X GET "$url" -o "/tmp-clone-responses/response_$i.json" &
+    i=$((i + 1))
+  done
+
+  wait
+  
+  # Read contents of all response files into variable
+  projects=""
+  for file in /tmp-clone-responses/*; do
+    if [ -z "$projects" ]; then
+      projects="$(cat "$file" | jq -r '.[] | .http_url_to_repo')"
+    else
+      projects="$projects\n$(cat "$file" | jq -r '.[] | .http_url_to_repo')"
+    fi
+  done
+
+  rm -r /tmp-clone-responses
 
   selected_project=$(echo "$projects" | fzf)
 
