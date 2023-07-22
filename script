@@ -1,0 +1,20 @@
+# Clone project from GitLab
+clone() {
+  token="PRIVATE-TOKEN: yourPersonalToken"
+  domain="yourGitLabDomain"
+
+  link_header=$(curl --head --header "$token" "https://$domain/api/v4/projects?per_page=100" | grep -i "link:")
+  last_page_url=$(echo "$link_header" | grep -oE '<[^>]+>; rel="last"' | sed -E 's/<(.+)>; rel="last"/\1/')
+  last_page_param=$(echo "$last_page_url" | grep -oP '&page=[\d]+')
+  last_page=$(echo "$last_page_param" | grep -oP '\d+')
+
+  projects=$(curl --header "$token" "https://$domain/api/v4/projects?per_page=100&page=1" | jq -r '.[] | .http_url_to_repo')
+
+  for ((i = 2; i <= $last_page; i++)); do
+    projects="$projects\n$(curl --header "$token" "https://$domain/api/v4/projects?per_page=100&page=$i" | jq -r '.[] | .http_url_to_repo')"
+  done
+
+  selected_project=$(echo "$projects" | fzf)
+
+  $(git clone "$selected_project")
+}
