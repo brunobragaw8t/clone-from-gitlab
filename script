@@ -5,7 +5,7 @@ clone() {
   domain="yourGitLabDomain"
 
   # Get last page number
-  link_header=$(curl --head --header "$token" https://gitlab.gruposalvadorcaetano.pt/api/v4/projects?per_page=100 | grep -i "link:")
+  link_header=$(curl --head --header "$token" https://$domain/api/v4/projects?per_page=100 | grep -i "link:")
   last_page_url=$(echo "$link_header" | grep -oE '<[^>]+>; rel="last"' | sed -E 's/<(.+)>; rel="last"/\1/')
   last_page_param=$(echo "$last_page_url" | grep -oP '&page=[\d]+')
   last_page=$(echo "$last_page_param" | grep -oP '\d+')
